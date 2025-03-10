@@ -3,6 +3,8 @@
 #include <qpainter.h>
 #include "ContoursOperations.h"
 #include <qpainterpath.h>
+#include <qdir.h>
+#include <quuid.h>
 
 void DrawOperations::drawRandomWell(QPixmap& image, const WellParams& params)
 {
@@ -54,12 +56,48 @@ void DrawOperations::drawWellTitle(QPainter& painter, const QPoint& wellPt, cons
 	painter.drawText(textPt, idWellStr);
 }
 
-void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour, QColor textColor, const QFont& font, int minTextDistance)
+void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour, QColor textColor, const QFont& font, int minTextDistance, bool saveToFile)
 {
 	painter.setPen(textColor);
 	painter.setFont(font);
 
 	QPainterPath clipPath;
+
+	QString contourFolderName;
+	QDir globalFolder;
+	QDir contourFolder;
+	bool deleteFolder = false;
+	if (saveToFile)
+	{
+		deleteFolder = true;
+
+		std::string resultImageGuid = std::to_string((long long)painter.device());
+		QString globalFolderName = QString::fromStdString(resultImageGuid);  // Глобальная папка по адресу устройства
+
+		// Проверяем, существует ли глобальная папка
+		if (!globalFolder.exists(globalFolderName))
+		{
+			// Если нет, создаем папку с уникальным именем
+			if (!globalFolder.mkpath(globalFolderName))
+			{
+				//qWarning() << "Не удалось создать глобальную папку:" << globalFolderName;
+			}
+		}
+
+		// Создаем уникальную папку для контура внутри глобальной папки
+		contourFolderName = QUuid::createUuid().toString();
+		contourFolderName = contourFolderName.mid(1, contourFolderName.length() - 2);  // Убираем фигурные скобки из GUID
+
+		// Папка для контура должна быть внутри глобальной папки, но не дублировать саму себя
+		contourFolder = QDir(globalFolderName);  // Убедитесь, что путь не будет ошибочно включать имя глобальной папки
+		if (!contourFolder.exists(contourFolderName))
+		{
+			if (!contourFolder.mkpath(contourFolderName))
+			{
+				//qWarning() << "Не удалось создать папку для контура:" << contourFolderName;
+			}
+		}
+	}
 
 	// Draw text along the contour points
 	// Calc the text rotation angle according to the slope of the line
@@ -109,7 +147,10 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 		rotatedFont.setPointSize(10);
 		rotatedFont.setBold(true);
 
-		QRectF textRect = painter.boundingRect(QRect(), Qt::AlignCenter, QString::number(contour.depth + 1));
+		// generate random 4-digit number
+		int randomNum = RandomGenerator::instance().getRandomInt(9999);
+
+		QRectF textRect = painter.boundingRect(QRect(), Qt::AlignCenter, QString::number(randomNum));
 
 		QTransform transform;
 		transform.translate(pt1.x(), pt1.y());
@@ -124,11 +165,40 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 		//painter.translate(-textRect.bottomRight());
 		painter.rotate(angle);
 
-		painter.drawText(textRect, Qt::AlignCenter, QString::number(contour.depth + 1));
+
+		//painter.drawText(textRect, Qt::AlignCenter, QString::number(contour.depth + 1));
+		painter.drawText(textRect, Qt::AlignCenter, QString::number(randomNum));
 		//painter.drawRect(textRect);
 		painter.restore();
 		painter.resetTransform();
+
+		// Теперь извлекаем часть изображения, содержащую этот текст
+		//QImage resultImage = painter.device().ima;  // Получаем текущее изображение
+		QPixmap resultImage = *(QPixmap*)painter.device();
+
+		// Копируем часть изображения с числом
+		QImage numberImage = resultImage.toImage().copy(rotatedRect.toRect());
+
+		if (!saveToFile)
+			continue;
+
+		// if number doesn't fit into resultImage, then skip it
+		if (rotatedRect.x() < 0 || rotatedRect.y() < 0 || rotatedRect.x() + rotatedRect.width() > resultImage.width() || rotatedRect.y() + rotatedRect.height() > resultImage.height())
+		{
+			continue;
+		}
+
+		// Сохраняем это изображение в уникальной папке
+        QString fileName = contourFolderName + "/contour_value_" + QString::number(randomNum) + ".png";
+        numberImage.save(contourFolder.absoluteFilePath(fileName), "PNG");
+
+		deleteFolder = false;
 	}
+
+	//if (deleteFolder)
+	//{
+	//	globalFolder.removeRecursively();
+	//}
 
 	QPainterPath clipInv;
 	clipInv.addRect({0,0,INT_MAX,INT_MAX});

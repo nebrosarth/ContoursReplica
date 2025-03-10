@@ -46,6 +46,7 @@ struct GenerationParams
     bool generateIsolines; // generate isolines
     bool fillContours; // fill contours with color
     bool drawValues; // draw values on isolines
+    bool saveValuesToFile; // save contour values to separate files
     int textDistance; // minimal distance between texts on isolines
 };
 

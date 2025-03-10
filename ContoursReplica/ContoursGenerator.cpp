@@ -37,6 +37,7 @@ GenerationParams ContoursGenerator::getUIParams()
 		params.generateIsolines = ui->groupBox_Contours->isChecked();
 		params.fillContours = ui->checkBox_Fill->isChecked();
 		params.drawValues = ui->groupBox_DrawValues->isChecked();
+		params.saveValuesToFile = ui->checkBox_saveValuesToFile->isChecked();
 		params.textDistance = ui->spinBox_TextDistance->value();
 	}
 	return params;
@@ -260,7 +261,7 @@ GenImg ContoursGenerator::generateImage()
 		{
 			if (params.drawValues)
 			{
-				DrawOperations::drawContourValues(painter, contour, QColor(Qt::black), font, params.textDistance);
+				DrawOperations::drawContourValues(painter, contour, QColor(Qt::black), font, params.textDistance, params.saveValuesToFile);
 			}
 			else
 			{
