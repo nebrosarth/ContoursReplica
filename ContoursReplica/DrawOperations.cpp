@@ -72,7 +72,7 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 		deleteFolder = true;
 
 		std::string resultImageGuid = std::to_string((long long)painter.device());
-		QString globalFolderName = QString::fromStdString(resultImageGuid);  // Глобальная папка по адресу устройства
+		QString globalFolderName = "tmp/" +  QString::fromStdString(resultImageGuid);  // Глобальная папка по адресу устройства
 
 		// Проверяем, существует ли глобальная папка
 		if (!globalFolder.exists(globalFolderName))
@@ -97,6 +97,7 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 				//qWarning() << "Не удалось создать папку для контура:" << contourFolderName;
 			}
 		}
+		contourFolder = QDir(globalFolderName + "/" + contourFolderName);
 	}
 
 	// Draw text along the contour points
@@ -189,16 +190,17 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 		}
 
 		// Сохраняем это изображение в уникальной папке
-        QString fileName = contourFolderName + "/contour_value_" + QString::number(randomNum) + ".png";
-        numberImage.save(contourFolder.absoluteFilePath(fileName), "PNG");
+		QString fileName = "contour_" + QString::number(randomNum) + ".png";
+		QString path = contourFolder.absoluteFilePath(fileName);
+		numberImage.save(contourFolder.absoluteFilePath(fileName), "PNG");
 
 		deleteFolder = false;
 	}
 
-	//if (deleteFolder)
-	//{
-	//	globalFolder.removeRecursively();
-	//}
+	if (contourFolder.isEmpty())
+	{
+		contourFolder.removeRecursively();
+	}
 
 	QPainterPath clipInv;
 	clipInv.addRect({0,0,INT_MAX,INT_MAX});
