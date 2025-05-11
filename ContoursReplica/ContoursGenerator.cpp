@@ -7,6 +7,8 @@
 #include <qfiledialog.h>
 #include <QProgressDialog>
 #include "RandomGenerator.h"
+#include <quuid.h>
+#include <filesystem>
 
 ContoursGenerator::ContoursGenerator(QWidget* parent)
 	: QMainWindow(parent)
@@ -29,6 +31,7 @@ GenerationParams ContoursGenerator::getUIParams()
 	{
 		params.height = ui->spinBox_Width->value();
 		params.width = ui->spinBox_Height->value();
+		params.dpi = ui->spinBox_dpi->value();
 		params.Xmul = ui->doubleSpinBox_Xmul->value();
 		params.Ymul = ui->doubleSpinBox_Ymul->value();
 		params.mul = ui->spinBox_mul->value();
@@ -176,132 +179,72 @@ GenImg ContoursGenerator::generateImage()
 
 	int cropSize = 1;
 
-	if (params.generateIsolines)
-	{
-		isolines = ContoursOperations::generateIsolines(params);
+	std::string temp_name = QUuid::createUuid().toString().toStdString();
+	std::string temp_mask_name = QUuid::createUuid().toString().toStdString();
 
-		mask = cv::Scalar(255) - isolines;
+	auto remove = [](std::string& str, char ch) {
+		str.erase(std::remove(str.begin(), str.end(), ch), str.end());
+		};
 
-		// apply thinning
-		cv::Mat thinned;
-		cv::ximgproc::thinning(mask, thinned, cv::ximgproc::THINNING_GUOHALL);
+	auto remove_guid = [&](std::string& str) {
+		remove(str, '{');
+		remove(str, '}');
+		remove(str, '"');
+		remove(str, '\'');
+		remove(str, '-');
+	};
+	remove_guid(temp_name);
+	remove_guid(temp_mask_name);
 
-		// crop by 1 pixel
-		cv::Rect cropRect(cropSize, cropSize, thinned.cols - 2 * cropSize, thinned.rows - 2 * cropSize);
-		thinned = thinned(cropRect);
+	const std::string output_path = temp_name + "_out.png";
+	const std::string output_mask_path = temp_mask_name + "_out.png";
 
-		std::vector<Contour> contours;
+	try {
+		const std::string python_command = "py -3.10 generate_contours.py --output " + output_path + " --output_mask " + output_mask_path
+			+ " --w " + std::to_string(params.width)
+			+ " --h " + std::to_string(params.height)
+			+ " --dpi " + std::to_string(params.dpi);
+		int ret_code = system(python_command.c_str());
 
-		// Find contours
-		ContoursOperations::findContours(thinned, contours);
-
-		cv::Mat contours_mat = cv::Mat::zeros(thinned.size(), CV_8UC1);
-		for (size_t i = 0; i < contours.size(); i++)
-		{
-			const Contour& c = contours[i];
-			cv::Scalar color = cv::Scalar(255, 255, 255);
-			for (size_t j = 0; j < c.points.size(); ++j)
-			{
-				contours_mat.at<uchar>(c.points[j]) = c.value;
-			}
+		if (ret_code != 0) {
+			throw std::runtime_error("Python script execution failed.");
 		}
 
-		// Find depth
-		ContoursOperations::findDepth(contours_mat, contours);
-
-		// Depth mat
-		cv::Mat depthMat = cv::Mat::zeros(thinned.size(), CV_8UC1);
-		for (size_t i = 0; i < contours.size(); i++)
-		{
-			const Contour& c = contours[i];
-			for (size_t j = 0; j < c.points.size(); ++j)
-			{
-				depthMat.at<uchar>(c.points[j]) = c.depth + 1;
-			}
+		cv::Mat result = cv::imread(output_path);
+		cv::Mat result_mask = cv::imread(output_mask_path);
+		if (result.empty() || result_mask.empty()) {
+			throw std::runtime_error("Failed to read output image.");
 		}
-
-		// Draw contours
-		cv::Mat drawing = params.fillContours ? cv::Mat::zeros(thinned.size(), CV_8UC3) : cv::Mat(thinned.size(), CV_8UC3, cv::Scalar(255, 255, 255));
-		for (size_t i = 0; i < contours.size(); i++)
-		{
-			for (size_t j = 0; j < contours[i].points.size(); ++j)
-			{
-				cv::Scalar color = contours[i].isClosed ? cv::Scalar(75, 75, 75) : cv::Scalar(150, 100, 150);
-				drawing.at<cv::Vec3b>(contours[i].points[j]) = cv::Vec3b(color[0], color[1], color[2]);
-			}
-		}
-
-		if (params.fillContours)
-		{
-			// Fill areas
-			ContoursOperations::fillContours(contours_mat, contours, drawing);
-		}
-
-		// Inpaint contours on drawing
-		cv::Mat maskInpaint = cv::Mat::zeros(thinned.size(), CV_8UC1);
-		for (size_t i = 0; i < contours.size(); i++)
-		{
-			const Contour& c = contours[i];
-			for (size_t j = 0; j < c.points.size(); ++j)
-			{
-				maskInpaint.at<uchar>(c.points[j]) = 255;
-			}
-		}
-
-		// Inpaint
-		cv::inpaint(drawing, maskInpaint, drawing, 3, cv::INPAINT_TELEA);
-
-		pixIso = utils::cvMat2Pixmap(drawing);
-
-		// Draw contours 
-		QFont font;
-		QPainter painter(&pixIso);
-
-		for (const auto& contour : contours)
-		{
-			if (params.drawValues)
-			{
-				DrawOperations::drawContourValues(painter, contour, QColor(Qt::black), font, params.textDistance, params.saveValuesToFile);
-			}
-			else
-			{
-				DrawOperations::drawContour(painter, contour, QColor(Qt::black));
-			}
-		}
-
-		cv::Mat temp = utils::QPixmap2cvMat(pixIso, false);
-
-		int xxxxx = 1;
 	}
-	else
-	{
-		isolines = cv::Mat::zeros(params.height, params.width, CV_8UC1);
-		mask = isolines.clone();
-		pixIso = utils::cvMat2Pixmap(isolines);
+	catch (...) {
+		if (std::filesystem::exists(output_path)) {
+			std::filesystem::remove(output_path);
+		}
+		if (std::filesystem::exists(output_mask_path)) {
+			std::filesystem::remove(output_mask_path);
+		}
+		throw;
 	}
+	
+	QPixmap pixIsolines(QString::fromStdString(output_path));
 
-	if (params.generateWells)
-	{
+	if (params.generateWells) {
 		WellParams wellParams = getUIWellParams();
-		for (int i = 0; i < params.numOfWells; ++i)
-		{
-			DrawOperations::drawRandomWell(pixIso, wellParams);
+		for (int i = 0; i < params.numOfWells; ++i) {
+			DrawOperations::drawRandomWell(pixIsolines, wellParams);
 		}
 	}
 
-	QPixmap pixMask = utils::cvMat2Pixmap(mask);
+	QPixmap pixMask(QString::fromStdString(output_mask_path));
 
-	// inpaint cropped pixels
-	cv::Mat pixIsoUncropped = utils::QPixmap2cvMat(pixIso, false);
-	cv::Mat maskUncropped = cv::Mat::zeros(pixIsoUncropped.size(), CV_8UC1);
-	// enlarge by 1 pixel
-	cv::copyMakeBorder(pixIsoUncropped, pixIsoUncropped, cropSize, cropSize, cropSize, cropSize, cv::BORDER_CONSTANT, cv::Scalar(255, 255, 255));
-	cv::copyMakeBorder(maskUncropped, maskUncropped, cropSize, cropSize, cropSize, cropSize, cv::BORDER_CONSTANT, cv::Scalar(255));
-	cv::inpaint(pixIsoUncropped, maskUncropped, pixIsoUncropped, 3, cv::INPAINT_TELEA);
+	if (std::filesystem::exists(output_path)) {
+		std::filesystem::remove(output_path);
+	}
+	if (std::filesystem::exists(output_mask_path)) {
+		std::filesystem::remove(output_mask_path);
+	}
 
-	QPixmap pixIsoResult = utils::cvMat2Pixmap(pixIsoUncropped);
-
-	GenImg result { pixIsoResult, pixMask };
+	GenImg result { pixIsolines, pixMask };
 	return result;
 }
 

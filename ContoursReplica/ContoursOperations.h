@@ -39,6 +39,7 @@ enum class Direction
 struct GenerationParams
 {
     int width, height; // image size
+    int dpi; // render dpi
     double Xmul, Ymul; // multipliers for X and Y for Perlin noise
     int mul; // general multiplier for Perlin noise
     bool generateWells; // generate wells
