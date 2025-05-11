@@ -72,9 +72,8 @@ def plot_terrain_map(field, num_levels=12,
 
         if draw_values:
             # 2.3 Подписи высот вдоль линий
-            fmt = {level: f"{level:.2f}" for level in levels}
-            ax.clabel(cs, fmt=fmt, inline=True,
-                    fontsize=8, inline_spacing=2)
+            fmt = {level: f"{round(level*100)}" for level in levels}
+            ax.clabel(cs, fmt=fmt, inline=True, fontsize=8, inline_spacing=2)
 
     ax.set_aspect('equal')
     ax.axis('off')
