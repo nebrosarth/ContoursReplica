@@ -27,6 +27,9 @@ def generate_height_field(width, height, scale=100.0,
 # 2. Построение и отрисовка карты с изолиниями и заливкой
 
 def plot_terrain_map(field, num_levels=12,
+                     draw_isolines=True,
+                     fill_isolines=True,
+                     draw_values=True,
                      cmap_name='RdYlGn_r',
                      output_file=None,
                      output_mask_file=None,
@@ -48,27 +51,30 @@ def plot_terrain_map(field, num_levels=12,
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # 2.1 Заливка областей градиентом посредством contourf
-    contourf = ax.contourf(
-        X, Y, field,
-        levels=levels,
-        cmap=matplotlib.colormaps.get_cmap(cmap_name),
-        antialiased=True
-    )
+    if draw_isolines:
+        # 2.1 Заливка областей градиентом посредством contourf
+        if fill_isolines:
+            contourf = ax.contourf(
+                X, Y, field,
+                levels=levels,
+                cmap=matplotlib.colormaps.get_cmap(cmap_name),
+                antialiased=True
+            )
 
-    # 2.2 Отрисовка изолиний
-    cs = ax.contour(
-        X, Y, field,
-        levels=levels,
-        colors='black',
-        linewidths=[0.8
-                    for i in range(len(levels))]
-    )
+        # 2.2 Отрисовка изолиний
+        cs = ax.contour(
+            X, Y, field,
+            levels=levels,
+            colors='black',
+            linewidths=[0.8
+                        for i in range(len(levels))]
+        )
 
-    # 2.3 Подписи высот вдоль линий
-    fmt = {level: f"{level:.2f}" for level in levels}
-    ax.clabel(cs, fmt=fmt, inline=True,
-              fontsize=8, inline_spacing=2)
+        if draw_values:
+            # 2.3 Подписи высот вдоль линий
+            fmt = {level: f"{level:.2f}" for level in levels}
+            ax.clabel(cs, fmt=fmt, inline=True,
+                    fontsize=8, inline_spacing=2)
 
     ax.set_aspect('equal')
     ax.axis('off')
@@ -105,6 +111,9 @@ if __name__ == '__main__':
     parser.add_argument('--w', type=int, help='Ширина сетки')
     parser.add_argument('--h', type=int, help='Высота сетки')
     parser.add_argument('--dpi', type=int, help='Разрешение рендера')
+    parser.add_argument('--draw_isolines', type=int, help='Рисовать изолинии')
+    parser.add_argument('--fill_isolines', type=int, help='Заливка изолиний')
+    parser.add_argument('--draw_values', type=int, help='Рисовать значения на изолиниях')
     parser.add_argument('-v', '--verbose', action='store_true', help='Логгирование')
 
     args = parser.parse_args()
@@ -128,6 +137,9 @@ if __name__ == '__main__':
         field,
         num_levels=15,
         cmap_name='RdYlGn_r',
+        draw_isolines = args.draw_isolines,
+        fill_isolines = args.fill_isolines,
+        draw_values = args.draw_values,
         output_file=args.output,
         output_mask_file=args.output_mask,
         dpi=dpi,

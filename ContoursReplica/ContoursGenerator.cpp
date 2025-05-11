@@ -9,6 +9,7 @@
 #include "RandomGenerator.h"
 #include <quuid.h>
 #include <filesystem>
+#include <windows.h>
 
 ContoursGenerator::ContoursGenerator(QWidget* parent)
 	: QMainWindow(parent)
@@ -169,6 +170,41 @@ void ContoursGenerator::OnSaveBatch()
 	progress.setValue(batchSize);
 }
 
+bool run_python_script_silently(const std::string& command)
+{
+	STARTUPINFOA si = { sizeof(STARTUPINFOA) };
+	PROCESS_INFORMATION pi;
+	si.dwFlags = STARTF_USESHOWWINDOW;
+	si.wShowWindow = SW_HIDE;  // скрыть окно
+
+	std::string cmd = "cmd.exe /C " + command;
+
+	BOOL success = CreateProcessA(
+		NULL,
+		cmd.data(),   // Command line
+		NULL, NULL,   // Process and thread security attributes
+		FALSE,        // Handle inheritance
+		CREATE_NO_WINDOW, // Creation flags
+		NULL, NULL,   // Environment and current directory
+		&si, &pi      // Startup and process info
+	);
+
+	if (!success) {
+		return false;
+	}
+
+	// Дождаться завершения скрипта
+	WaitForSingleObject(pi.hProcess, INFINITE);
+
+	DWORD exit_code = 0;
+	GetExitCodeProcess(pi.hProcess, &exit_code);
+
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+
+	return exit_code == 0;
+}
+
 GenImg ContoursGenerator::generateImage()
 {
 	GenerationParams params = getUIParams();
@@ -203,10 +239,14 @@ GenImg ContoursGenerator::generateImage()
 		const std::string python_command = "py -3.10 generate_contours.py --output " + output_path + " --output_mask " + output_mask_path
 			+ " --w " + std::to_string(params.width)
 			+ " --h " + std::to_string(params.height)
-			+ " --dpi " + std::to_string(params.dpi);
-		int ret_code = system(python_command.c_str());
+			+ " --dpi " + std::to_string(params.dpi)
+			+ " --draw_isolines " + std::to_string(params.generateIsolines)
+			+ " --fill_isolines " + std::to_string(params.fillContours)
+			+ " --draw_values " + std::to_string(params.drawValues)
+			;
+		bool success = run_python_script_silently(python_command);
 
-		if (ret_code != 0) {
+		if (!success) {
 			throw std::runtime_error("Python script execution failed.");
 		}
 
