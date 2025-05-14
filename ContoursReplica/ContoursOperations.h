@@ -36,6 +36,12 @@ enum class Direction
     NONE
 };
 
+enum class GenerationMode
+{
+    legacy,
+    python
+};
+
 struct GenerationParams
 {
     int width, height; // image size
@@ -49,6 +55,7 @@ struct GenerationParams
     bool drawValues; // draw values on isolines
     bool saveValuesToFile; // save contour values to separate files
     int textDistance; // minimal distance between texts on isolines
+    GenerationMode mode;
 };
 
 namespace ContoursOperations

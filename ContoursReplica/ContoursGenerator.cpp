@@ -10,6 +10,7 @@
 #include <quuid.h>
 #include <filesystem>
 #include <windows.h>
+#include "Strings.h"
 
 ContoursGenerator::ContoursGenerator(QWidget* parent)
 	: QMainWindow(parent)
@@ -18,6 +19,8 @@ ContoursGenerator::ContoursGenerator(QWidget* parent)
 	ui->setupUi(this);
 
 	initConnections();
+
+	OnChangeMode();
 }
 
 ContoursGenerator::~ContoursGenerator()
@@ -43,6 +46,7 @@ GenerationParams ContoursGenerator::getUIParams()
 		params.drawValues = ui->groupBox_DrawValues->isChecked();
 		params.saveValuesToFile = ui->checkBox_saveValuesToFile->isChecked();
 		params.textDistance = ui->spinBox_TextDistance->value();
+		params.mode = getGenMode();
 	}
 	return params;
 }
@@ -57,6 +61,8 @@ void ContoursGenerator::initConnections()
 	connect(ui->checkBox_ShowMask, &QCheckBox::stateChanged, this, &ContoursGenerator::OnUpdateImage);
 	connect(ui->pushButton_Save, &QPushButton::pressed, this, &ContoursGenerator::OnSaveImage);
 	connect(ui->pushButton_GenerateBatch, &QPushButton::pressed, this, &ContoursGenerator::OnSaveBatch);
+	connect(ui->radioButton_method1, &QRadioButton::toggled, this, &ContoursGenerator::OnChangeMode);
+	connect(ui->radioButton_method2, &QRadioButton::toggled, this, &ContoursGenerator::OnChangeMode);
 }
 
 void ContoursGenerator::OnGenerateImage()
@@ -143,6 +149,16 @@ void ContoursGenerator::saveImageSplit(const QString& folderPath, const GenImg& 
 	}
 }
 
+GenerationMode ContoursGenerator::getGenMode()
+{
+	if (ui) {
+		if (ui->radioButton_method1->isChecked()) {
+			return GenerationMode::python;
+		}
+	}
+	return GenerationMode::legacy;
+}
+
 void ContoursGenerator::OnSaveBatch()
 {
 	QString folderName = QFileDialog::getExistingDirectory(this);
@@ -170,12 +186,30 @@ void ContoursGenerator::OnSaveBatch()
 	progress.setValue(batchSize);
 }
 
+void ContoursGenerator::OnChangeMode()
+{
+	GenerationMode mode = getGenMode();
+
+	if (mode == GenerationMode::python) {
+		ui->spinBox_TextDistance->setEnabled(false);
+		ui->spinBox_dpi->setEnabled(true);
+		ui->label_width->setText(str_width);
+		ui->label_height->setText(str_height);
+	}
+	else if (mode == GenerationMode::legacy) {
+		ui->spinBox_TextDistance->setEnabled(true);
+		ui->spinBox_dpi->setEnabled(false);
+		ui->label_width->setText(str_width_pixels);
+		ui->label_height->setText(str_height_pixels);
+	}
+}
+
 bool run_python_script_silently(const std::string& command)
 {
 	STARTUPINFOA si = { sizeof(STARTUPINFOA) };
 	PROCESS_INFORMATION pi;
 	si.dwFlags = STARTF_USESHOWWINDOW;
-	si.wShowWindow = SW_HIDE;  // скрыть окно
+	si.wShowWindow = SW_HIDE;  // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ
 
 	std::string cmd = "cmd.exe /C " + command;
 
@@ -193,7 +227,7 @@ bool run_python_script_silently(const std::string& command)
 		return false;
 	}
 
-	// Дождаться завершения скрипта
+	// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 	WaitForSingleObject(pi.hProcess, INFINITE);
 
 	DWORD exit_code = 0;
@@ -206,6 +240,137 @@ bool run_python_script_silently(const std::string& command)
 }
 
 GenImg ContoursGenerator::generateImage()
+{
+	GenerationParams params = getUIParams();
+
+	if (params.mode == GenerationMode::python) {
+		return _generateImage_python();
+	}
+	else {
+		return _generateImage_legacy();
+	}
+}
+
+GenImg ContoursGenerator::_generateImage_legacy()
+{
+	GenerationParams params = getUIParams();
+
+	cv::Mat isolines; // isolines mat
+	cv::Mat mask; // mask mat
+	QPixmap pixIso; // visual representation pixmap
+
+	int cropSize = 1;
+
+	if (params.generateIsolines) {
+		isolines = ContoursOperations::generateIsolines(params);
+
+		mask = cv::Scalar(255) - isolines;
+
+		// apply thinning
+		cv::Mat thinned;
+		cv::ximgproc::thinning(mask, thinned, cv::ximgproc::THINNING_GUOHALL);
+
+		// crop by 1 pixel
+		cv::Rect cropRect(cropSize, cropSize, thinned.cols - 2 * cropSize, thinned.rows - 2 * cropSize);
+		thinned = thinned(cropRect);
+
+		std::vector<Contour> contours;
+
+		// Find contours
+		ContoursOperations::findContours(thinned, contours);
+
+		cv::Mat contours_mat = cv::Mat::zeros(thinned.size(), CV_8UC1);
+		for (size_t i = 0; i < contours.size(); i++) {
+			const Contour& c = contours[i];
+			cv::Scalar color = cv::Scalar(255, 255, 255);
+			for (size_t j = 0; j < c.points.size(); ++j) {
+				contours_mat.at<uchar>(c.points[j]) = c.value;
+			}
+		}
+
+		// Find depth
+		ContoursOperations::findDepth(contours_mat, contours);
+
+		// Depth mat
+		cv::Mat depthMat = cv::Mat::zeros(thinned.size(), CV_8UC1);
+		for (size_t i = 0; i < contours.size(); i++) {
+			const Contour& c = contours[i];
+			for (size_t j = 0; j < c.points.size(); ++j) {
+				depthMat.at<uchar>(c.points[j]) = c.depth + 1;
+			}
+		}
+
+		// Draw contours
+		cv::Mat drawing = params.fillContours ? cv::Mat::zeros(thinned.size(), CV_8UC3) : cv::Mat(thinned.size(), CV_8UC3, cv::Scalar(255, 255, 255));
+		for (size_t i = 0; i < contours.size(); i++) {
+			for (size_t j = 0; j < contours[i].points.size(); ++j) {
+				cv::Scalar color = contours[i].isClosed ? cv::Scalar(75, 75, 75) : cv::Scalar(150, 100, 150);
+				drawing.at<cv::Vec3b>(contours[i].points[j]) = cv::Vec3b(color[0], color[1], color[2]);
+			}
+		}
+
+		if (params.fillContours) {
+			// Fill areas
+			ContoursOperations::fillContours(contours_mat, contours, drawing);
+		}
+
+		// Inpaint contours on drawing
+		cv::Mat maskInpaint = cv::Mat::zeros(thinned.size(), CV_8UC1);
+		for (size_t i = 0; i < contours.size(); i++) {
+			const Contour& c = contours[i];
+			for (size_t j = 0; j < c.points.size(); ++j) {
+				maskInpaint.at<uchar>(c.points[j]) = 255;
+			}
+		}
+
+		// Inpaint
+		cv::inpaint(drawing, maskInpaint, drawing, 3, cv::INPAINT_TELEA);
+
+		pixIso = utils::cvMat2Pixmap(drawing);
+
+		// Draw contours 
+		QFont font;
+		QPainter painter(&pixIso);
+
+		for (const auto& contour : contours) {
+			if (params.drawValues) {
+				DrawOperations::drawContourValues(painter, contour, QColor(Qt::black), font, params.textDistance, params.saveValuesToFile);
+			}
+			else {
+				DrawOperations::drawContour(painter, contour, QColor(Qt::black));
+			}
+		}
+	}
+	else {
+		isolines = cv::Mat::zeros(params.height, params.width, CV_8UC1);
+		mask = isolines.clone();
+		pixIso = utils::cvMat2Pixmap(isolines);
+	}
+
+	if (params.generateWells) {
+		WellParams wellParams = getUIWellParams();
+		for (int i = 0; i < params.numOfWells; ++i) {
+			DrawOperations::drawRandomWell(pixIso, wellParams);
+		}
+	}
+
+	QPixmap pixMask = utils::cvMat2Pixmap(mask);
+
+	// inpaint cropped pixels
+	cv::Mat pixIsoUncropped = utils::QPixmap2cvMat(pixIso, false);
+	cv::Mat maskUncropped = cv::Mat::zeros(pixIsoUncropped.size(), CV_8UC1);
+	// enlarge by 1 pixel
+	cv::copyMakeBorder(pixIsoUncropped, pixIsoUncropped, cropSize, cropSize, cropSize, cropSize, cv::BORDER_CONSTANT, cv::Scalar(255, 255, 255));
+	cv::copyMakeBorder(maskUncropped, maskUncropped, cropSize, cropSize, cropSize, cropSize, cv::BORDER_CONSTANT, cv::Scalar(255));
+	cv::inpaint(pixIsoUncropped, maskUncropped, pixIsoUncropped, 3, cv::INPAINT_TELEA);
+
+	QPixmap pixIsoResult = utils::cvMat2Pixmap(pixIsoUncropped);
+
+	GenImg result{ pixIsoResult, pixMask };
+	return result;
+}
+
+GenImg ContoursGenerator::_generateImage_python()
 {
 	GenerationParams params = getUIParams();
 
@@ -228,7 +393,7 @@ GenImg ContoursGenerator::generateImage()
 		remove(str, '"');
 		remove(str, '\'');
 		remove(str, '-');
-	};
+		};
 	remove_guid(temp_name);
 	remove_guid(temp_mask_name);
 
@@ -265,7 +430,7 @@ GenImg ContoursGenerator::generateImage()
 		}
 		throw;
 	}
-	
+
 	QPixmap pixIsolines(QString::fromStdString(output_path));
 
 	if (params.generateWells) {

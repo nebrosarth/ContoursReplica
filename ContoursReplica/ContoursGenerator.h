@@ -36,14 +36,18 @@ protected slots:
     void OnUpdateImage();
     void OnSaveImage();
     void OnSaveBatch();
+    void OnChangeMode();
 
 protected:
     void initConnections();
     GenerationParams getUIParams();
     GenImg generateImage();
+    GenImg _generateImage_legacy();
+    GenImg _generateImage_python();
     WellParams getUIWellParams();
     void saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask);
     void saveImageSplit(const QString& folderPath, const GenImg& gen);
+    GenerationMode getGenMode();
 
     template<int size>
     void setSize(); // set image size
