@@ -209,7 +209,7 @@ bool run_python_script_silently(const std::string& command)
 	STARTUPINFOA si = { sizeof(STARTUPINFOA) };
 	PROCESS_INFORMATION pi;
 	si.dwFlags = STARTF_USESHOWWINDOW;
-	si.wShowWindow = SW_HIDE;  // ������ ����
+	si.wShowWindow = SW_HIDE;
 
 	std::string cmd = "cmd.exe /C " + command;
 
@@ -227,7 +227,6 @@ bool run_python_script_silently(const std::string& command)
 		return false;
 	}
 
-	// ��������� ���������� �������
 	WaitForSingleObject(pi.hProcess, INFINITE);
 
 	DWORD exit_code = 0;
@@ -328,7 +327,7 @@ GenImg ContoursGenerator::_generateImage_legacy()
 
 		pixIso = utils::cvMat2Pixmap(drawing);
 
-		// Draw contours 
+		// Draw contours
 		QFont font;
 		QPainter painter(&pixIso);
 

@@ -72,29 +72,29 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 		deleteFolder = true;
 
 		std::string resultImageGuid = std::to_string((long long)painter.device());
-		QString globalFolderName = "tmp/" +  QString::fromStdString(resultImageGuid);  // Глобальная папка по адресу устройства
+		QString globalFolderName = "tmp/" +  QString::fromStdString(resultImageGuid);  // Р“Р»РѕР±Р°Р»СЊРЅР°СЏ РїР°РїРєР° РїРѕ Р°РґСЂРµСЃСѓ СѓСЃС‚СЂРѕР№СЃС‚РІР°
 
-		// Проверяем, существует ли глобальная папка
+		// РџСЂРѕРІРµСЂСЏРµРј, СЃСѓС‰РµСЃС‚РІСѓРµС‚ Р»Рё РіР»РѕР±Р°Р»СЊРЅР°СЏ РїР°РїРєР°
 		if (!globalFolder.exists(globalFolderName))
 		{
-			// Если нет, создаем папку с уникальным именем
+			// Р•СЃР»Рё РЅРµС‚, СЃРѕР·РґР°РµРј РїР°РїРєСѓ СЃ СѓРЅРёРєР°Р»СЊРЅС‹Рј РёРјРµРЅРµРј
 			if (!globalFolder.mkpath(globalFolderName))
 			{
-				//qWarning() << "Не удалось создать глобальную папку:" << globalFolderName;
+				//qWarning() << "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РіР»РѕР±Р°Р»СЊРЅСѓСЋ РїР°РїРєСѓ:" << globalFolderName;
 			}
 		}
 
-		// Создаем уникальную папку для контура внутри глобальной папки
+		// РЎРѕР·РґР°РµРј СѓРЅРёРєР°Р»СЊРЅСѓСЋ РїР°РїРєСѓ РґР»СЏ РєРѕРЅС‚СѓСЂР° РІРЅСѓС‚СЂРё РіР»РѕР±Р°Р»СЊРЅРѕР№ РїР°РїРєРё
 		contourFolderName = QUuid::createUuid().toString();
-		contourFolderName = contourFolderName.mid(1, contourFolderName.length() - 2);  // Убираем фигурные скобки из GUID
+		contourFolderName = contourFolderName.mid(1, contourFolderName.length() - 2);  // РЈР±РёСЂР°РµРј С„РёРіСѓСЂРЅС‹Рµ СЃРєРѕР±РєРё РёР· GUID
 
-		// Папка для контура должна быть внутри глобальной папки, но не дублировать саму себя
-		contourFolder = QDir(globalFolderName);  // Убедитесь, что путь не будет ошибочно включать имя глобальной папки
+		// РџР°РїРєР° РґР»СЏ РєРѕРЅС‚СѓСЂР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ РІРЅСѓС‚СЂРё РіР»РѕР±Р°Р»СЊРЅРѕР№ РїР°РїРєРё, РЅРѕ РЅРµ РґСѓР±Р»РёСЂРѕРІР°С‚СЊ СЃР°РјСѓ СЃРµР±СЏ
+		contourFolder = QDir(globalFolderName);  // РЈР±РµРґРёС‚РµСЃСЊ, С‡С‚Рѕ РїСѓС‚СЊ РЅРµ Р±СѓРґРµС‚ РѕС€РёР±РѕС‡РЅРѕ РІРєР»СЋС‡Р°С‚СЊ РёРјСЏ РіР»РѕР±Р°Р»СЊРЅРѕР№ РїР°РїРєРё
 		if (!contourFolder.exists(contourFolderName))
 		{
 			if (!contourFolder.mkpath(contourFolderName))
 			{
-				//qWarning() << "Не удалось создать папку для контура:" << contourFolderName;
+				//qWarning() << "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РїР°РїРєСѓ РґР»СЏ РєРѕРЅС‚СѓСЂР°:" << contourFolderName;
 			}
 		}
 		contourFolder = QDir(globalFolderName + "/" + contourFolderName);
@@ -173,11 +173,11 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 		painter.restore();
 		painter.resetTransform();
 
-		// Теперь извлекаем часть изображения, содержащую этот текст
-		//QImage resultImage = painter.device().ima;  // Получаем текущее изображение
+		// РўРµРїРµСЂСЊ РёР·РІР»РµРєР°РµРј С‡Р°СЃС‚СЊ РёР·РѕР±СЂР°Р¶РµРЅРёСЏ, СЃРѕРґРµСЂР¶Р°С‰СѓСЋ СЌС‚РѕС‚ С‚РµРєСЃС‚
+		//QImage resultImage = painter.device().ima;  // РџРѕР»СѓС‡Р°РµРј С‚РµРєСѓС‰РµРµ РёР·РѕР±СЂР°Р¶РµРЅРёРµ
 		QPixmap resultImage = *(QPixmap*)painter.device();
 
-		// Копируем часть изображения с числом
+		// РљРѕРїРёСЂСѓРµРј С‡Р°СЃС‚СЊ РёР·РѕР±СЂР°Р¶РµРЅРёСЏ СЃ С‡РёСЃР»РѕРј
 		QImage numberImage = resultImage.toImage().copy(rotatedRect.toRect());
 
 		if (!saveToFile)
@@ -189,7 +189,7 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 			continue;
 		}
 
-		// Сохраняем это изображение в уникальной папке
+		// РЎРѕС…СЂР°РЅСЏРµРј СЌС‚Рѕ РёР·РѕР±СЂР°Р¶РµРЅРёРµ РІ СѓРЅРёРєР°Р»СЊРЅРѕР№ РїР°РїРєРµ
 		QString fileName = "contour_" + QString::number(randomNum) + ".png";
 		QString path = contourFolder.absoluteFilePath(fileName);
 		numberImage.save(contourFolder.absoluteFilePath(fileName), "PNG");
