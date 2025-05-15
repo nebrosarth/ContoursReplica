@@ -108,7 +108,7 @@ void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img,
 	QDir().mkpath(folderPath + "/masks");
 
 	QString baseName;
-	int index = 0;
+	int index = 1;
 	QString imageFileName, maskFileName;
 	do
 	{
