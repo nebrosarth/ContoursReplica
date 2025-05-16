@@ -56,7 +56,7 @@ void DrawOperations::drawWellTitle(QPainter& painter, const QPoint& wellPt, cons
 	painter.drawText(textPt, idWellStr);
 }
 
-void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour, QColor textColor, const QFont& font, int minTextDistance, bool saveToFile)
+void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour, float width, QColor textColor, const QFont& font, int minTextDistance, bool saveToFile)
 {
 	painter.setPen(textColor);
 	painter.setFont(font);
@@ -208,13 +208,15 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 
 	painter.setClipPath(clipInv);
 
-	drawContour(painter, contour, Qt::black);
+	drawContour(painter, contour, Qt::black, width);
 }
 
-void DrawOperations::drawContour(QPainter& painter, const Contour& contour, QColor color)
+void DrawOperations::drawContour(QPainter& painter, const Contour& contour, QColor color, float width)
 {
 	// Draw contour polyline
-	painter.setPen(color);
+	QPen pen(color);
+	pen.setWidthF(width);
+	painter.setPen(pen);
 	std::vector<QPoint> pts;
 	pts.reserve(contour.points.size());
 	for (auto& pt : contour.points)

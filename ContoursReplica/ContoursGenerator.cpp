@@ -31,28 +31,39 @@ ContoursGenerator::~ContoursGenerator()
 GenerationParams ContoursGenerator::getUIParams()
 {
 	GenerationParams params{};
-	if (ui)
-	{
+	if (ui) {
 		params.height = ui->spinBox_Width->value();
 		params.width = ui->spinBox_Height->value();
 		params.dpi = ui->spinBox_dpi->value();
 		params.Xmul = ui->doubleSpinBox_Xmul->value();
 		params.Ymul = ui->doubleSpinBox_Ymul->value();
-		params.mul = ui->spinBox_mul->value();
+
+		int minMul = ui->spinBox_TotalMulMin->value();
+		int maxMul = ui->spinBox_TotalMulMax->value();
+		params.mul = RandomGenerator::instance().getRandomInt(minMul, maxMul);
+
 		params.generateWells = ui->groupBox_Wells->isChecked();
 		params.numOfWells = ui->spinBox_Wells->value();
 		params.generateIsolines = ui->groupBox_Contours->isChecked();
-		params.contoursMinDensity = ui->spinBox_MinDensity->value();
-		params.contoursMaxDensity = ui->spinBox_MaxDensity->value();
-		params.contoursMinThickness = ui->doubleSpinBox_MinThickness->value();
-		params.contoursMaxThickness = ui->doubleSpinBox_MaxThickness->value();
+
+		int minDensity = ui->spinBox_MinDensity->value();
+		int maxDensity = ui->spinBox_MaxDensity->value();
+		params.contoursDensity = RandomGenerator::instance().getRandomInt(minDensity, maxDensity);
+
+		double minThickness = ui->doubleSpinBox_MinThickness->value();
+		double maxThickness = ui->doubleSpinBox_MaxThickness->value();
+		params.contoursThickness = RandomGenerator::instance().getRandomFloat(static_cast<float>(minThickness), static_cast<float>(maxThickness));
+
 		params.fillContours = ui->groupBox_Fill->isChecked();
 		params.fillMode = getFillMode();
 		params.drawValues = ui->groupBox_DrawValues->isChecked();
 		params.saveValuesToFile = ui->checkBox_saveValuesToFile->isChecked();
 		params.textDistance = ui->spinBox_TextDistance->value();
-		params.textMinSize = ui->spinBox_TextMinSize->value();
-		params.textMaxSize = ui->spinBox_TextMaxSize->value();
+
+		int minTextSize = ui->spinBox_TextMinSize->value();
+		int maxTextSize = ui->spinBox_TextMaxSize->value();
+		params.textSize = RandomGenerator::instance().getRandomInt(minTextSize, maxTextSize);
+
 		params.mode = getGenMode();
 	}
 	return params;
@@ -71,6 +82,7 @@ void ContoursGenerator::initConnections()
 	connect(ui->radioButton_method1, &QRadioButton::toggled, this, &ContoursGenerator::OnChangeMode);
 	connect(ui->radioButton_method2, &QRadioButton::toggled, this, &ContoursGenerator::OnChangeMode);
 
+	connectRange(ui->spinBox_TotalMulMin, ui->spinBox_TotalMulMax);
 	connectRange(ui->spinBox_TextMinSize, ui->spinBox_TextMaxSize);
 	connectRange(ui->doubleSpinBox_MinThickness, ui->doubleSpinBox_MaxThickness);
 	connectRange(ui->spinBox_MinDensity, ui->spinBox_MaxDensity);
@@ -290,6 +302,7 @@ GenImg ContoursGenerator::_generateImage_legacy()
 	cv::Mat isolines; // isolines mat
 	cv::Mat mask; // mask mat
 	QPixmap pixIso; // visual representation pixmap
+	QPixmap pixMask; // mask representation pixmap
 
 	int cropSize = 1;
 
@@ -306,9 +319,8 @@ GenImg ContoursGenerator::_generateImage_legacy()
 		cv::Rect cropRect(cropSize, cropSize, thinned.cols - 2 * cropSize, thinned.rows - 2 * cropSize);
 		thinned = thinned(cropRect);
 
-		std::vector<Contour> contours;
-
 		// Find contours
+		std::vector<Contour> contours;
 		ContoursOperations::findContours(thinned, contours);
 
 		cv::Mat contours_mat = cv::Mat::zeros(thinned.size(), CV_8UC1);
@@ -343,7 +355,7 @@ GenImg ContoursGenerator::_generateImage_legacy()
 
 		if (params.fillContours) {
 			// Fill areas
-			ContoursOperations::fillContours(contours_mat, contours, drawing);
+			ContoursOperations::fillContours(contours_mat, contours, drawing, params.fillMode);
 		}
 
 		// Inpaint contours on drawing
@@ -361,22 +373,36 @@ GenImg ContoursGenerator::_generateImage_legacy()
 		pixIso = utils::cvMat2Pixmap(drawing);
 
 		// Draw contours
+		float thickness = params.contoursThickness;
 		QFont font;
-		QPainter painter(&pixIso);
-
-		for (const auto& contour : contours) {
-			if (params.drawValues) {
-				DrawOperations::drawContourValues(painter, contour, QColor(Qt::black), font, params.textDistance, params.saveValuesToFile);
+		font.setPointSize(params.textSize);
+		{
+			QPainter painter(&pixIso);
+			for (const auto& contour : contours) {
+				if (params.drawValues) {
+					DrawOperations::drawContourValues(painter, contour, thickness, QColor(Qt::black), font, params.textDistance, params.saveValuesToFile);
+				}
+				else {
+					DrawOperations::drawContour(painter, contour, QColor(Qt::black), thickness);
+				}
 			}
-			else {
-				DrawOperations::drawContour(painter, contour, QColor(Qt::black));
+		}
+
+		// Draw mask
+		mask = cv::Mat::zeros(params.height, params.width, CV_8UC1);
+		pixMask = utils::cvMat2Pixmap(mask);
+		{
+			QPainter painter(&pixMask);
+			for (const auto& contour : contours) {
+				DrawOperations::drawContour(painter, contour, QColor(Qt::white), thickness);
 			}
 		}
 	}
 	else {
-		isolines = cv::Mat::zeros(params.height, params.width, CV_8UC1);
-		mask = isolines.clone();
+		mask = cv::Mat::zeros(params.height, params.width, CV_8UC1);
+		isolines = mask.clone() + cv::Scalar(255);
 		pixIso = utils::cvMat2Pixmap(isolines);
+		pixMask = utils::cvMat2Pixmap(mask);
 	}
 
 	if (params.generateWells) {
@@ -385,8 +411,6 @@ GenImg ContoursGenerator::_generateImage_legacy()
 			DrawOperations::drawRandomWell(pixIso, wellParams);
 		}
 	}
-
-	QPixmap pixMask = utils::cvMat2Pixmap(mask);
 
 	// inpaint cropped pixels
 	cv::Mat pixIsoUncropped = utils::QPixmap2cvMat(pixIso, false);
@@ -440,12 +464,9 @@ GenImg ContoursGenerator::_generateImage_python()
 			+ " --draw_isolines " + std::to_string(params.generateIsolines)
 			+ " --fill_isolines " + std::to_string(params.fillContours)
 			+ " --draw_values " + std::to_string(params.drawValues)
-			+ " --text_min_size " + std::to_string(params.textMinSize)
-			+ " --text_max_size " + std::to_string(params.textMaxSize)
-			+ " --contours_min_density " + std::to_string(params.contoursMinDensity)
-			+ " --contours_max_density " + std::to_string(params.contoursMaxDensity)
-			+ " --contours_min_thickness " + std::to_string(params.contoursMinThickness)
-			+ " --contours_max_thickness " + std::to_string(params.contoursMaxThickness)
+			+ " --text_size " + std::to_string(params.textSize)
+			+ " --contours_density " + std::to_string(params.contoursDensity)
+			+ " --contours_thickness " + std::to_string(params.contoursThickness)
 			+ " --fill_mode " + std::to_string(static_cast<int>(params.fillMode))
 			;
 		bool success = run_python_script_silently(python_command);

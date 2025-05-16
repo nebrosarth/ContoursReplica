@@ -303,7 +303,20 @@ void ContoursOperations::findDepth(cv::Mat& img, std::vector<Contour>& contours)
 	}
 }
 
-void ContoursOperations::fillContours(cv::Mat& contoursMat, const std::vector<Contour>& contours, cv::Mat& drawing)
+cv::Scalar getRandomBrightColor(float minLum = 80.0f)
+{
+	while (true) {
+		int r = RandomGenerator::instance().getRandomInt(256);
+		int g = RandomGenerator::instance().getRandomInt(256);
+		int b = RandomGenerator::instance().getRandomInt(256);
+		float lum = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+		if (lum >= minLum) {
+			return cv::Scalar(b, g, r);
+		}
+	}
+}
+
+void ContoursOperations::fillContours(cv::Mat& contoursMat, const std::vector<Contour>& contours, cv::Mat& drawing, FillMode fillMode)
 {
 	int max_depth = 0;
 
@@ -315,7 +328,22 @@ void ContoursOperations::fillContours(cv::Mat& contoursMat, const std::vector<Co
 		}
 	}
 
-	ColorScaler scaler(-1, max_depth, cv::Scalar(18, 185, 27), cv::Scalar(20, 20, 185));
+	ColorScaler scaler;
+	if (fillMode == FillMode::random) {
+		float minLum = 20.0f;
+		cv::Scalar c1 = getRandomBrightColor(minLum);
+		cv::Scalar c2 = getRandomBrightColor(minLum);
+		auto colorDistance = [](const cv::Scalar& a, const cv::Scalar& b) {
+			return std::abs(a[0] - b[0]) + std::abs(a[1] - b[1]) + std::abs(a[2] - b[2]);
+		};
+		while (colorDistance(c1, c2) < 200) {
+			c2 = getRandomBrightColor(minLum);
+		}
+		scaler.init(-1, max_depth, c1, c2);
+	}
+	else {
+		scaler.init(-1, max_depth, cv::Scalar(18, 185, 27), cv::Scalar(20, 20, 185));
+	}
 
 	int width = contoursMat.cols;
 	int height = contoursMat.rows;
@@ -381,6 +409,14 @@ ColorScaler::ColorScaler(double min, double max, const cv::Scalar& minColor, con
 	, m_minColor(minColor)
 	, m_maxColor(maxColor)
 {
+}
+
+void ColorScaler::init(double min, double max, const cv::Scalar& minColor, const cv::Scalar& maxColor)
+{
+	m_min = min;
+	m_max = max;
+	m_minColor = minColor;
+	m_maxColor = maxColor;
 }
 
 cv::Scalar ColorScaler::getColor(double value) const

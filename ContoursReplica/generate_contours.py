@@ -101,10 +101,11 @@ def plot_terrain_map(field, num_levels=12,
         fig2.patch.set_facecolor('black')
         ax2.set_facecolor('black')
 
-        ax2.contour(X, Y, field, levels=levels,
-                    colors='white',
-                    linewidths=[thickness_isolines
-                                for i in range(len(levels))])
+        if draw_isolines:
+            ax2.contour(X, Y, field, levels=levels,
+                        colors='white',
+                        linewidths=[thickness_isolines
+                                    for i in range(len(levels))])
         ax2.set_aspect('equal')
         ax2.axis('off')
         plt.tight_layout()
@@ -123,12 +124,9 @@ if __name__ == '__main__':
     parser.add_argument('--draw_isolines', type=int, help='Рисовать изолинии')
     parser.add_argument('--fill_isolines', type=int, help='Заливка изолиний')
     parser.add_argument('--draw_values', type=int, help='Рисовать значения на изолиниях')
-    parser.add_argument('--text_min_size', type=int, help='Минимальный размер текста значений на изолиниях')
-    parser.add_argument('--text_max_size', type=int, help='Максимальный размер текста значений на изолиниях')
-    parser.add_argument('--contours_min_density', type=int, help='Минимальная плотность изолиний')
-    parser.add_argument('--contours_max_density', type=int, help='Максимальная плотность изолиний')
-    parser.add_argument('--contours_min_thickness', type=float, help='Минимальная толщина изолиний')
-    parser.add_argument('--contours_max_thickness', type=float, help='Максимальная толщина изолиний')
+    parser.add_argument('--text_size', type=int, help='Размер текста значений на изолиниях')
+    parser.add_argument('--contours_density', type=int, help='Рлотность изолиний')
+    parser.add_argument('--contours_thickness', type=float, help='Толщина изолиний')
     parser.add_argument('--fill_mode', type=int, help='Цветовая схема: 0 - Стандарт, 1 - Случайная')
     parser.add_argument('-v', '--verbose', action='store_true', help='Логгирование')
 
@@ -150,9 +148,9 @@ if __name__ == '__main__':
         seed=seed
     )
 
-    font_size = np.random.randint(args.text_min_size, args.text_max_size) if args.text_min_size < args.text_max_size else args.text_min_size
-    density = np.random.randint(args.contours_min_density, args.contours_max_density) if args.contours_min_density < args.contours_max_density else args.contours_min_density
-    thickness = np.random.uniform(args.contours_min_thickness, args.contours_max_thickness) if args.contours_min_thickness < args.contours_max_thickness else args.contours_min_thickness
+    font_size = args.text_size
+    density = args.contours_density
+    thickness = args.contours_thickness
 
     plot_terrain_map(
         field,

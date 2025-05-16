@@ -11,6 +11,8 @@ public:
 	QPoint getRandomPoint(int maxWidth, int maxHeight);
 	QColor getRandomColor();
 	int getRandomInt(int max);
+	int getRandomInt(int min, int max);
+	float getRandomFloat(float min, float max);
 
 	RandomGenerator(const RandomGenerator&) = delete;
 	void operator=(const RandomGenerator&) = delete;

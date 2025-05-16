@@ -15,6 +15,8 @@ class ColorScaler
 {
 public:
     ColorScaler(double min, double max, const cv::Scalar& minColor, const cv::Scalar& maxColor);
+    ColorScaler() {}
+    void init(double min, double max, const cv::Scalar& minColor, const cv::Scalar& maxColor);
     cv::Scalar getColor(double value) const;
 protected:
     double m_min;
@@ -57,17 +59,14 @@ struct GenerationParams
     bool generateWells; // generate wells
     int numOfWells; // number of wells
     bool generateIsolines; // generate isolines
-    int contoursMinDensity; // minimal contours density
-    int contoursMaxDensity; // maximum contours density
-    float contoursMinThickness; // minimal contours thickness
-    float contoursMaxThickness; // maximum contours thickness
+    int contoursDensity; // contours density
+    float contoursThickness; // contours thickness
     bool fillContours; // fill contours with color
     FillMode fillMode; // fill color scheme
     bool drawValues; // draw values on isolines
     bool saveValuesToFile; // save contour values to separate files
     int textDistance; // minimal distance between texts on isolines
-    int textMinSize; // minimal value font size
-    int textMaxSize; // maximum value font size
+    int textSize; // font size
     GenerationMode mode;
 };
 
@@ -80,6 +79,6 @@ namespace ContoursOperations
     std::vector<cv::Point> getOrder(cv::Point pt, Direction direction);
     // Find depth of each contour
     void findDepth(cv::Mat& img, std::vector<Contour>& contours);
-    void fillContours(cv::Mat& contoursMat, const std::vector<Contour>& contours, cv::Mat& drawing);
+    void fillContours(cv::Mat& contoursMat, const std::vector<Contour>& contours, cv::Mat& drawing, FillMode fillMode);
 };
 
