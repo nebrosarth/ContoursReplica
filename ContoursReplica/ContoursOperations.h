@@ -42,6 +42,12 @@ enum class GenerationMode
     python
 };
 
+enum class FillMode
+{
+    standard,
+    random
+};
+
 struct GenerationParams
 {
     int width, height; // image size
@@ -51,10 +57,17 @@ struct GenerationParams
     bool generateWells; // generate wells
     int numOfWells; // number of wells
     bool generateIsolines; // generate isolines
+    int contoursMinDensity; // minimal contours density
+    int contoursMaxDensity; // maximum contours density
+    float contoursMinThickness; // minimal contours thickness
+    float contoursMaxThickness; // maximum contours thickness
     bool fillContours; // fill contours with color
+    FillMode fillMode; // fill color scheme
     bool drawValues; // draw values on isolines
     bool saveValuesToFile; // save contour values to separate files
     int textDistance; // minimal distance between texts on isolines
+    int textMinSize; // minimal value font size
+    int textMaxSize; // maximum value font size
     GenerationMode mode;
 };
 

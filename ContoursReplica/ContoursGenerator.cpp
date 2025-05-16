@@ -42,10 +42,17 @@ GenerationParams ContoursGenerator::getUIParams()
 		params.generateWells = ui->groupBox_Wells->isChecked();
 		params.numOfWells = ui->spinBox_Wells->value();
 		params.generateIsolines = ui->groupBox_Contours->isChecked();
-		params.fillContours = ui->checkBox_Fill->isChecked();
+		params.contoursMinDensity = ui->spinBox_MinDensity->value();
+		params.contoursMaxDensity = ui->spinBox_MaxDensity->value();
+		params.contoursMinThickness = ui->doubleSpinBox_MinThickness->value();
+		params.contoursMaxThickness = ui->doubleSpinBox_MaxThickness->value();
+		params.fillContours = ui->groupBox_Fill->isChecked();
+		params.fillMode = getFillMode();
 		params.drawValues = ui->groupBox_DrawValues->isChecked();
 		params.saveValuesToFile = ui->checkBox_saveValuesToFile->isChecked();
 		params.textDistance = ui->spinBox_TextDistance->value();
+		params.textMinSize = ui->spinBox_TextMinSize->value();
+		params.textMaxSize = ui->spinBox_TextMaxSize->value();
 		params.mode = getGenMode();
 	}
 	return params;
@@ -63,6 +70,10 @@ void ContoursGenerator::initConnections()
 	connect(ui->pushButton_GenerateBatch, &QPushButton::pressed, this, &ContoursGenerator::OnSaveBatch);
 	connect(ui->radioButton_method1, &QRadioButton::toggled, this, &ContoursGenerator::OnChangeMode);
 	connect(ui->radioButton_method2, &QRadioButton::toggled, this, &ContoursGenerator::OnChangeMode);
+
+	connectRange(ui->spinBox_TextMinSize, ui->spinBox_TextMaxSize);
+	connectRange(ui->doubleSpinBox_MinThickness, ui->doubleSpinBox_MaxThickness);
+	connectRange(ui->spinBox_MinDensity, ui->spinBox_MaxDensity);
 }
 
 void ContoursGenerator::OnGenerateImage()
@@ -159,6 +170,16 @@ GenerationMode ContoursGenerator::getGenMode()
 	return GenerationMode::legacy;
 }
 
+FillMode ContoursGenerator::getFillMode()
+{
+	if (ui) {
+		if (ui->radioButton_FillRandom->isChecked()) {
+			return FillMode::random;
+		}
+	}
+	return FillMode::standard;
+}
+
 void ContoursGenerator::OnSaveBatch()
 {
 	QString folderName = QFileDialog::getExistingDirectory(this);
@@ -195,13 +216,25 @@ void ContoursGenerator::OnChangeMode()
 		ui->spinBox_dpi->setEnabled(true);
 		ui->label_width->setText(str_width);
 		ui->label_height->setText(str_height);
+		ui->groupBox_PerlinNoise->setVisible(false);
+		ui->spinBox_MinDensity->setVisible(true);
+		ui->spinBox_MaxDensity->setVisible(true);
+		ui->label_MinDensity->setVisible(true);
+		ui->label_MaxDensity->setVisible(true);
 	}
 	else if (mode == GenerationMode::legacy) {
 		ui->spinBox_TextDistance->setEnabled(true);
 		ui->spinBox_dpi->setEnabled(false);
 		ui->label_width->setText(str_width_pixels);
 		ui->label_height->setText(str_height_pixels);
+		ui->groupBox_PerlinNoise->setVisible(true);
+		ui->spinBox_MinDensity->setVisible(false);
+		ui->spinBox_MaxDensity->setVisible(false);
+		ui->label_MinDensity->setVisible(false);
+		ui->label_MaxDensity->setVisible(false);
 	}
+
+	resize(width(), 1);
 }
 
 bool run_python_script_silently(const std::string& command)
@@ -407,6 +440,13 @@ GenImg ContoursGenerator::_generateImage_python()
 			+ " --draw_isolines " + std::to_string(params.generateIsolines)
 			+ " --fill_isolines " + std::to_string(params.fillContours)
 			+ " --draw_values " + std::to_string(params.drawValues)
+			+ " --text_min_size " + std::to_string(params.textMinSize)
+			+ " --text_max_size " + std::to_string(params.textMaxSize)
+			+ " --contours_min_density " + std::to_string(params.contoursMinDensity)
+			+ " --contours_max_density " + std::to_string(params.contoursMaxDensity)
+			+ " --contours_min_thickness " + std::to_string(params.contoursMinThickness)
+			+ " --contours_max_thickness " + std::to_string(params.contoursMaxThickness)
+			+ " --fill_mode " + std::to_string(static_cast<int>(params.fillMode))
 			;
 		bool success = run_python_script_silently(python_command);
 

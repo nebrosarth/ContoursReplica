@@ -48,9 +48,42 @@ protected:
     void saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask);
     void saveImageSplit(const QString& folderPath, const GenImg& gen);
     GenerationMode getGenMode();
+    FillMode getFillMode();
 
     template<int size>
     void setSize(); // set image size
+
+    template <typename SpinBoxT>
+    void connectRange(SpinBoxT* minWidget, SpinBoxT* maxWidget)
+    {
+        using ValueT = decltype(minWidget->value());
+
+        auto sync = [this, minWidget, maxWidget]() {
+            QObject* obj = this->sender();
+            auto senderSpin = qobject_cast<SpinBoxT*>(obj);
+            if (!senderSpin) return;
+
+            ValueT minVal = minWidget->value();
+            ValueT maxVal = maxWidget->value();
+
+            QSignalBlocker blockMin(minWidget);
+            QSignalBlocker blockMax(maxWidget);
+
+            if (senderSpin == minWidget && minVal > maxVal) {
+                maxWidget->setValue(minVal);
+            }
+            else if (senderSpin == maxWidget && maxVal < minVal) {
+                minWidget->setValue(maxVal);
+            }
+            };
+
+        connect(minWidget,
+            QOverload<ValueT>::of(&SpinBoxT::valueChanged),
+            this, sync);
+        connect(maxWidget,
+            QOverload<ValueT>::of(&SpinBoxT::valueChanged),
+            this, sync);
+    }
 
 private:
     Ui::ContoursGeneratorClass *ui;
