@@ -209,6 +209,8 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 	painter.setClipPath(clipInv);
 
 	drawContour(painter, contour, Qt::black, width);
+
+	painter.setClipping(false);
 }
 
 void DrawOperations::drawContour(QPainter& painter, const Contour& contour, QColor color, float width)
