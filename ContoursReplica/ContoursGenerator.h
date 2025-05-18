@@ -10,11 +10,13 @@ QT_END_NAMESPACE
 
 struct GenerationParams;
 struct WellParams;
+struct BoundingBox;
 
 struct GenImg
 {
     QPixmap image;
     QPixmap mask;
+    std::vector<BoundingBox> bboxes;
 };
 
 namespace utils
@@ -45,7 +47,7 @@ protected:
     GenImg _generateImage_legacy();
     GenImg _generateImage_python();
     WellParams getUIWellParams();
-    void saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask);
+    void saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask, const std::vector<BoundingBox>& bboxes);
     void saveImageSplit(const QString& folderPath, const GenImg& gen);
     GenerationMode getGenMode();
     FillMode getFillMode();
@@ -89,4 +91,5 @@ private:
     Ui::ContoursGeneratorClass *ui;
     QPixmap m_generatedImage;
     QPixmap m_generatedMask;
+    std::vector<BoundingBox> m_bboxes;
 };

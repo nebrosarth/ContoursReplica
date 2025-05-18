@@ -65,6 +65,7 @@ struct GenerationParams
     FillMode fillMode; // fill color scheme
     bool drawValues; // draw values on isolines
     bool saveValuesToFile; // save contour values to separate files
+    bool saveBoundingBoxesToFile; // save contour values' bounding boxes to file
     int textDistance; // minimal distance between texts on isolines
     int textSize; // font size
     GenerationMode mode;

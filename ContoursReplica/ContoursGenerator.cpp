@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <windows.h>
 #include "Strings.h"
+#include "qtextstream.h"
 
 ContoursGenerator::ContoursGenerator(QWidget* parent)
 	: QMainWindow(parent)
@@ -58,6 +59,7 @@ GenerationParams ContoursGenerator::getUIParams()
 		params.fillMode = getFillMode();
 		params.drawValues = ui->groupBox_DrawValues->isChecked();
 		params.saveValuesToFile = ui->checkBox_saveValuesToFile->isChecked();
+		params.saveBoundingBoxesToFile = ui->checkBox_SaveBB->isChecked();
 		params.textDistance = ui->spinBox_TextDistance->value();
 
 		int minTextSize = ui->spinBox_TextMinSize->value();
@@ -93,6 +95,7 @@ void ContoursGenerator::OnGenerateImage()
 	GenImg genImg = generateImage();
 	m_generatedImage = genImg.image;
 	m_generatedMask = genImg.mask;
+	m_bboxes = genImg.bboxes;
 
 	OnUpdateImage();
 }
@@ -122,24 +125,53 @@ void ContoursGenerator::OnSaveImage()
 		return;
 	}
 
-	saveImage(folderName, m_generatedImage, m_generatedMask);
+	saveImage(folderName, m_generatedImage, m_generatedMask, m_bboxes);
 }
 
-void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask)
+void saveBoundingBoxesToFile(const std::vector<BoundingBox>& bbs, const QString& filePath)
+{
+	QFile file(filePath);
+	if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+		QTextStream out(&file);
+
+		for (const BoundingBox& bb : bbs) {
+			QPointF topLeft = bb.bbox.topLeft();
+			QPointF topRight = bb.bbox.topRight();
+			QPointF bottomRight = bb.bbox.bottomRight();
+			QPointF bottomLeft = bb.bbox.bottomLeft();
+
+			out << static_cast<int>(topLeft.x()) << "," << static_cast<int>(topLeft.y()) << ","
+				<< static_cast<int>(topRight.x()) << "," << static_cast<int>(topRight.y()) << ","
+				<< static_cast<int>(bottomRight.x()) << "," << static_cast<int>(bottomRight.y()) << ","
+				<< static_cast<int>(bottomLeft.x()) << "," << static_cast<int>(bottomLeft.y()) << ",";
+
+			out << bb.value;
+
+			out << "\n";
+		}
+
+		file.close();
+	}
+}
+
+void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask, const std::vector<BoundingBox>& bboxes)
 {
 	QDir().mkpath(folderPath + "/images");
 	QDir().mkpath(folderPath + "/masks");
+	if (!bboxes.empty())
+		QDir().mkpath(folderPath + "/bboxes");
 
 	QString baseName;
 	int index = 1;
-	QString imageFileName, maskFileName;
+	QString imageFileName, maskFileName, bboxFileName;
 	do
 	{
 		baseName = QString::number(index);
 		imageFileName = folderPath + "/images/" + baseName + ".jpg";
 		maskFileName = folderPath + "/masks/" + baseName + ".jpg";
+		bboxFileName = folderPath + "/bboxes/" + baseName + ".txt";
 		index++;
-	} while (QFile::exists(imageFileName) || QFile::exists(maskFileName));
+	} while (QFile::exists(imageFileName) || QFile::exists(maskFileName) || QFile::exists(bboxFileName));
 
 	if (!img.save(imageFileName, "JPG"))
 	{
@@ -150,6 +182,8 @@ void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img,
 		QFile::remove(imageFileName);
 		return;
 	}
+	if (!bboxes.empty())
+		saveBoundingBoxesToFile(bboxes, bboxFileName);
 }
 
 void ContoursGenerator::saveImageSplit(const QString& folderPath, const GenImg& gen)
@@ -167,7 +201,7 @@ void ContoursGenerator::saveImageSplit(const QString& folderPath, const GenImg& 
 			QRect rect(i * baseSize, j * baseSize, baseSize, baseSize);
 			QPixmap img = gen.image.copy(rect);
 			QPixmap mask = gen.mask.copy(rect);
-			saveImage(folderPath, img, mask);
+			saveImage(folderPath, img, mask, gen.bboxes);
 		}
 	}
 }
@@ -303,6 +337,7 @@ GenImg ContoursGenerator::_generateImage_legacy()
 	cv::Mat mask; // mask mat
 	QPixmap pixIso; // visual representation pixmap
 	QPixmap pixMask; // mask representation pixmap
+	std::vector<BoundingBox> bboxes;
 
 	int cropSize = 1;
 
@@ -380,7 +415,7 @@ GenImg ContoursGenerator::_generateImage_legacy()
 			QPainter painter(&pixIso);
 			for (const auto& contour : contours) {
 				if (params.drawValues) {
-					DrawOperations::drawContourValues(painter, contour, thickness, QColor(Qt::black), font, params.textDistance, params.saveValuesToFile);
+					DrawOperations::drawContourValues(painter, contour, thickness, QColor(Qt::black), font, params.textDistance, params.saveValuesToFile, params.saveBoundingBoxesToFile, bboxes);
 				}
 				else {
 					DrawOperations::drawContour(painter, contour, QColor(Qt::black), thickness);
@@ -422,7 +457,7 @@ GenImg ContoursGenerator::_generateImage_legacy()
 
 	QPixmap pixIsoResult = utils::cvMat2Pixmap(pixIsoUncropped);
 
-	GenImg result{ pixIsoResult, pixMask };
+	GenImg result{ pixIsoResult, pixMask, bboxes };
 	return result;
 }
 

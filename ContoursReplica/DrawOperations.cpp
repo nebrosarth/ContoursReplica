@@ -56,7 +56,7 @@ void DrawOperations::drawWellTitle(QPainter& painter, const QPoint& wellPt, cons
 	painter.drawText(textPt, idWellStr);
 }
 
-void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour, float width, QColor textColor, const QFont& font, int minTextDistance, bool saveToFile)
+void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour, float width, QColor textColor, const QFont& font, int minTextDistance, bool saveToFile, bool saveBBtoFile, std::vector<BoundingBox>& bbox)
 {
 	painter.setPen(textColor);
 	painter.setFont(font);
@@ -180,7 +180,7 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 		// Копируем часть изображения с числом
 		QImage numberImage = resultImage.toImage().copy(rotatedRect.toRect());
 
-		if (!saveToFile)
+		if (!saveToFile && !saveBBtoFile)
 			continue;
 
 		// if number doesn't fit into resultImage, then skip it
@@ -189,12 +189,18 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 			continue;
 		}
 
-		// Сохраняем это изображение в уникальной папке
-		QString fileName = "contour_" + QString::number(randomNum) + ".png";
-		QString path = contourFolder.absoluteFilePath(fileName);
-		numberImage.save(contourFolder.absoluteFilePath(fileName), "PNG");
+		if (saveBBtoFile) {
+			bbox.emplace_back(rotatedRect, QString::number(randomNum));
+		}
 
-		deleteFolder = false;
+		if (saveToFile) {
+			// Сохраняем это изображение в уникальной папке
+			QString fileName = "contour_" + QString::number(randomNum) + ".png";
+			QString path = contourFolder.absoluteFilePath(fileName);
+			numberImage.save(contourFolder.absoluteFilePath(fileName), "PNG");
+
+			deleteFolder = false;
+		}
 	}
 
 	if (contourFolder.isEmpty())
